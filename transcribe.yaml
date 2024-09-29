@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation stack to automate transcription of MP4 audio using Amazon Transcribe.
+
+Parameters:
+  InputBucketName:
+    Type: String
+    Default: !Sub "${AWS::StackName}-transcribe-input"
+    Description: "The name of the input S3 bucket for MP4 files"
+  OutputBucketName:
+    Type: String
+    Default: !Sub "${AWS::StackName}-transcribe-output"
+    Description: "The name of the output S3 bucket for transcription results"
+
+Resources:
+  # S3 Bucket for Input Files (MP4s)
+  TranscribeS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties: 
+      BucketName: !Ref InputBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 30
+            Prefix: ''
+      LoggingConfiguration:
+        DestinationBucketName: !Sub "${AWS::StackName}-logs"
+        LogFilePrefix: "transcribe-access-logs/"
+
+  # S3 Bucket for Transcription Output
+  TranscribeOutputBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref OutputBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # IAM Role for Lambda Function to Access S3 and Transcribe
+  TranscribeLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TranscribeLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: 
+                  - !Sub "arn:aws:s3:::${TranscribeS3Bucket}/*"
+                  - !Sub "arn:aws:s3:::${TranscribeOutputBucket}/*"
+              - Effect: Allow
+                Action:
+                  - transcribe:StartTranscriptionJob
+                  - transcribe:GetTranscriptionJob
+                Resource: "*"
+
+  # Lambda Function for Audio Transcription Trigger
+  TranscribeLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: "TranscribeAudioFunction"
+      Handler: index.handler
+      Role: !GetAtt TranscribeLambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 300  # Adjusted for longer-running transcription jobs
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+
+          s3 = boto3.client('s3')
+          transcribe = boto3.client('transcribe')
+
+          def handler(event, context):
+              try:
+                  bucket = event['Records'][0]['s3']['bucket']['name']
+                  key = event['Records'][0]['s3']['object']['key']
+
+                  audio_file_uri = f"s3://{bucket}/{key}"
+                  job_name = key.split('.')[0]
+                  output_bucket = os.environ['OUTPUT_BUCKET']
+
+                  response = transcribe.start_transcription_job(
+                      TranscriptionJobName=job_name,
+                      Media={'MediaFileUri': audio_file_uri},
+                      MediaFormat='mp4',
+                      LanguageCode='en-US',
+                      OutputBucketName=output_bucket
+                  )
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps(f"Started transcription job {job_name}")
+                  }
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps(f"Failed to start transcription: {str(e)}")
+                  }
+
+      Environment:
+        Variables:
+          OUTPUT_BUCKET: !Ref TranscribeOutputBucket
+  
+  # S3 Bucket Policy for Lambda Function Access
+  TranscribeS3BucketPermission:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref TranscribeS3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: 's3:PutObject'
+            Effect: Allow
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Resource: !Sub "arn:aws:s3:::${TranscribeS3Bucket}/*"
+
+  # Lambda Permission for S3 Trigger
+  TranscribeLambdaS3Trigger:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref TranscribeLambda
+      Principal: 's3.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt TranscribeS3Bucket.Arn
+
+  # S3 Bucket Notification to Trigger Lambda on Object Creation
+  S3BucketNotification:
+    Type: 'AWS::S3::BucketNotification'
+    Properties:
+      Bucket: !Ref TranscribeS3Bucket
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Function: !GetAtt TranscribeLambda.Arn
+
+Outputs:
+  InputS3Bucket:
+    Description: "S3 bucket to upload MP4 files"
+    Value: !Ref TranscribeS3Bucket
+  
+  OutputS3Bucket:
+    Description: "S3 bucket where transcription results will be stored"
+    Value: !Ref TranscribeOutputBucket
+
+  LambdaFunctionARN:
+    Description: "ARN of the Transcription Lambda Function"
+    Value: !GetAtt TranscribeLambda.Arn
