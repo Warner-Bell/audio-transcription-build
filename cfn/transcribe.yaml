@@ -1,18 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation stack to automate transcription of MP4 audio using Amazon Transcribe.
+Description: CloudFormation stack to automate transcription of MP4, MP3, and WAV audio using Amazon Transcribe.
 
 Parameters:
   InputBucketName:
     Type: String
-    Default: !Sub "${AWS::StackName}-transcribe-input"
-    Description: "The name of the input S3 bucket for MP4 files"
+    Default: !Sub "${AWS::StackName}-transcribe-input-${AWS::AccountId}-${AWS::Region}"
+    Description: "The name of the input S3 bucket for audio files (MP4, MP3, WAV)"
   OutputBucketName:
     Type: String
-    Default: !Sub "${AWS::StackName}-transcribe-output"
+    Default: !Sub "${AWS::StackName}-transcribe-output-${AWS::AccountId}-${AWS::Region}"
     Description: "The name of the output S3 bucket for transcription results"
 
 Resources:
-  # S3 Bucket for Input Files (MP4s)
+  # S3 Bucket for Input Files (MP4, MP3, WAV)
   TranscribeS3Bucket:
     Type: 'AWS::S3::Bucket'
     Properties: 
@@ -21,13 +21,14 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      BucketKeyEnabled: true
       LifecycleConfiguration:
         Rules:
           - Status: Enabled
-            ExpirationInDays: 30
-            Prefix: ''
+            ExpirationInDays: 1
+            Prefix: ''  # All objects will expire after 1 day
       LoggingConfiguration:
-        DestinationBucketName: !Sub "${AWS::StackName}-logs"
+        DestinationBucketName: !Ref TranscribeS3LogBucket
         LogFilePrefix: "transcribe-access-logs/"
 
   # S3 Bucket for Transcription Output
@@ -39,6 +40,23 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      BucketKeyEnabled: true
+
+  # S3 Bucket for Logging
+  TranscribeS3LogBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-logs-${AWS::AccountId}-${AWS::Region}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      AccessControl: LogDeliveryWrite  # Grant write permissions to S3 logs delivery service
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 7  # Logs will expire after 7 days
+            Prefix: ''
 
   # IAM Role for Lambda Function to Access S3 and Transcribe
   TranscribeLambdaRole:
@@ -67,7 +85,7 @@ Resources:
                 Action:
                   - transcribe:StartTranscriptionJob
                   - transcribe:GetTranscriptionJob
-                Resource: "*"
+                Resource: "*"  # Keeping as is for now
 
   # Lambda Function for Audio Transcription Trigger
   TranscribeLambda:
@@ -77,17 +95,22 @@ Resources:
       Handler: index.handler
       Role: !GetAtt TranscribeLambdaRole.Arn
       Runtime: python3.9
-      Timeout: 300  # Adjusted for longer-running transcription jobs
+      Timeout: 600  # Increased timeout to 10 minutes
       Code:
         ZipFile: |
           import json
           import boto3
           import os
+          import logging
 
           s3 = boto3.client('s3')
           transcribe = boto3.client('transcribe')
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
 
           def handler(event, context):
+              logger.info(f"Received event: {json.dumps(event)}")  # Added logging for incoming event
+
               try:
                   bucket = event['Records'][0]['s3']['bucket']['name']
                   key = event['Records'][0]['s3']['object']['key']
@@ -95,28 +118,41 @@ Resources:
                   audio_file_uri = f"s3://{bucket}/{key}"
                   job_name = key.split('.')[0]
                   output_bucket = os.environ['OUTPUT_BUCKET']
+                  media_format = key.split('.')[-1]
+
+                  # Valid media formats supported by this Lambda function
+                  supported_formats = ['mp4', 'mp3', 'wav']
+                  if media_format not in supported_formats:
+                      raise Exception(f"Unsupported media format: {media_format}")
 
                   response = transcribe.start_transcription_job(
                       TranscriptionJobName=job_name,
                       Media={'MediaFileUri': audio_file_uri},
-                      MediaFormat='mp4',
+                      MediaFormat=media_format,
                       LanguageCode='en-US',
                       OutputBucketName=output_bucket
                   )
+                  logger.info(f"Started transcription job {job_name}")
                   return {
                       'statusCode': 200,
                       'body': json.dumps(f"Started transcription job {job_name}")
                   }
               except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'body': json.dumps(f"Failed to start transcription: {str(e)}")
-                  }
+                  logger.error(f"Error processing file {key} in bucket {bucket}: {str(e)}")  # Enhanced error logging
+                  raise e  # Raising the exception for better traceability
 
       Environment:
         Variables:
           OUTPUT_BUCKET: !Ref TranscribeOutputBucket
+          INPUT_BUCKET: !Ref TranscribeS3Bucket  # Added input bucket as environment variable
   
+  # Lambda Retention Policy
+  TranscribeLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TranscribeLambda.FunctionName}"
+      RetentionInDays: 30
+
   # S3 Bucket Policy for Lambda Function Access
   TranscribeS3BucketPermission:
     Type: 'AWS::S3::BucketPolicy'
@@ -125,7 +161,9 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Action: 's3:PutObject'
+          - Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
             Effect: Allow
             Principal:
               Service: 'lambda.amazonaws.com'
@@ -150,10 +188,19 @@ Resources:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'
             Function: !GetAtt TranscribeLambda.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: ".mp4"
+                  - Name: suffix
+                    Value: ".mp3"
+                  - Name: suffix
+                    Value: ".wav"
 
 Outputs:
   InputS3Bucket:
-    Description: "S3 bucket to upload MP4 files"
+    Description: "S3 bucket to upload MP4, MP3, WAV files"
     Value: !Ref TranscribeS3Bucket
   
   OutputS3Bucket:
