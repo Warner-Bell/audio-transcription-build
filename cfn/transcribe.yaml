@@ -30,6 +30,9 @@ Resources:
       LoggingConfiguration:
         DestinationBucketName: !Ref TranscribeS3LogBucket
         LogFilePrefix: "transcribe-access-logs/"
+      Tags:
+        - Key: Workload
+          Value: Transcription
 
   # S3 Bucket for Transcription Output
   TranscribeOutputBucket:
@@ -41,6 +44,9 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       BucketKeyEnabled: true
+      Tags:
+        - Key: Workload
+          Value: Transcription
 
   # S3 Bucket for Logging
   TranscribeS3LogBucket:
@@ -57,6 +63,9 @@ Resources:
           - Status: Enabled
             ExpirationInDays: 7  # Logs will expire after 7 days
             Prefix: ''
+      Tags:
+        - Key: Workload
+          Value: Transcription
 
   # IAM Role for Lambda Function to Access S3 and Transcribe
   TranscribeLambdaRole:
@@ -86,6 +95,9 @@ Resources:
                   - transcribe:StartTranscriptionJob
                   - transcribe:GetTranscriptionJob
                 Resource: "*"  # Keeping as is for now
+      Tags:
+        - Key: Workload
+          Value: Transcription
 
   # Lambda Function for Audio Transcription Trigger
   TranscribeLambda:
@@ -140,11 +152,13 @@ Resources:
               except Exception as e:
                   logger.error(f"Error processing file {key} in bucket {bucket}: {str(e)}")  # Enhanced error logging
                   raise e  # Raising the exception for better traceability
-
       Environment:
         Variables:
           OUTPUT_BUCKET: !Ref TranscribeOutputBucket
           INPUT_BUCKET: !Ref TranscribeS3Bucket  # Added input bucket as environment variable
+      Tags:
+        - Key: Workload
+          Value: Transcription
   
   # Lambda Retention Policy
   TranscribeLambdaLogGroup:
@@ -152,6 +166,9 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${TranscribeLambda.FunctionName}"
       RetentionInDays: 30
+      Tags:
+        - Key: Workload
+          Value: Transcription
 
   # S3 Bucket Policy for Lambda Function Access
   TranscribeS3BucketPermission:
