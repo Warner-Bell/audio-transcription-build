@@ -44,10 +44,10 @@ Follow these steps to deploy the stack using AWS CloudFormation:
    cd audio-transcription-automation
    ```
 
-2. **Deploy the CloudFormation stack** using the AWS CLI:
+2. **Deploy the CloudFormation stack** using the `deploy-transcription.sh` file or the AWS CLI:
    ```bash
    aws cloudformation deploy \
-     --template-file template.yaml \
+     --template-file transcribe.yaml \
      --stack-name audio-transcription-stack \
      --capabilities CAPABILITY_NAMED_IAM
    ```
