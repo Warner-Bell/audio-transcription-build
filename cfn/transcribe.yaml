@@ -85,19 +85,21 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                Resource: 
+                  - s3:*  # Full S3 access
+                Resource:
+                  - !Sub "arn:aws:s3:::${InputBucketName}"
                   - !Sub "arn:aws:s3:::${InputBucketName}/*"
+                  - !Sub "arn:aws:s3:::${OutputBucketName}"
                   - !Sub "arn:aws:s3:::${OutputBucketName}/*"
               - Effect: Allow
                 Action:
                   - transcribe:StartTranscriptionJob
                   - transcribe:GetTranscriptionJob
-                Resource: "*"
+                Resource: "*"  # Transcribe permissions for all jobs
       Tags:
         - Key: Workload
           Value: Transcription
+
 
   # Lambda Function for Audio Transcription Trigger
   TranscribeLambda:
@@ -115,6 +117,7 @@ Resources:
           import os
           import logging
           import re
+          from datetime import datetime
 
           s3 = boto3.client('s3')
           transcribe = boto3.client('transcribe')
@@ -129,8 +132,10 @@ Resources:
 
                   audio_file_uri = f"s3://{bucket}/{key}"
                   
-                  # Generate job name from key, removing or replacing unsupported characters
-                  job_name = re.sub(r'[^0-9a-zA-Z._-]', '_', key.split('.')[0])
+                  # Generate a unique job name using a timestamp
+                  base_job_name = re.sub(r'[^0-9a-zA-Z._-]', '_', key.split('.')[0])
+                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                  job_name = f"{base_job_name}_{timestamp}"
 
                   output_bucket = os.environ['OUTPUT_BUCKET']
                   media_format = key.split('.')[-1]
@@ -139,6 +144,7 @@ Resources:
                   if media_format not in supported_formats:
                       raise Exception(f"Unsupported media format: {media_format}")
 
+                  # Start transcription job
                   response = transcribe.start_transcription_job(
                       TranscriptionJobName=job_name,
                       Media={'MediaFileUri': audio_file_uri},
@@ -147,6 +153,7 @@ Resources:
                       OutputBucketName=output_bucket
                   )
                   logger.info(f"Started transcription job {job_name}")
+
                   return {
                       'statusCode': 200,
                       'body': json.dumps(f"Started transcription job {job_name}")
@@ -158,12 +165,16 @@ Resources:
         Variables:
           OUTPUT_BUCKET: !Ref OutputBucketName
 
+      Tags:
+          - Key: Workload
+            Value: Transcription
+
   # Lambda Log Group Retention Policy
   TranscribeLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${TranscribeLambda}"
-      RetentionInDays: 3  # Set to a valid retention period
+      RetentionInDays: 1  # Set to a valid retention period
 
 Outputs:
   InputS3Bucket:

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables - replace these with actual values or modify to accept inputs
-INPUT_BUCKET_NAME="audio-transcription-stack-input-us-east-1"         # S3 Bucket for input files
+INPUT_BUCKET_NAME="transcription-stack-input-us-east-1"         # S3 Bucket for input files
 LAMBDA_FUNCTION_NAME="TranscribeAudioFunction" # Name of the Lambda function
 AWS_REGION="us-east-1"                          # AWS Region
 ACCOUNT_ID="198101904822"                       # AWS Account ID
