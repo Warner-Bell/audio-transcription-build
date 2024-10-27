@@ -9,9 +9,9 @@ REGION="us-east-1" # Modify this to your preferred AWS region
 PROFILE="default" # Adjust if using a named profile
 
 # Bucket names
-INPUT_BUCKET_NAME="${STACK_NAME}-input-${REGION}"
-OUTPUT_BUCKET_NAME="${STACK_NAME}-output-${REGION}"
-LOG_BUCKET_NAME="${STACK_NAME}-logs-${REGION}"
+INPUT_BUCKET_NAME="${STACK_NAME}-input"
+OUTPUT_BUCKET_NAME="${STACK_NAME}-output"
+LOG_BUCKET_NAME="${STACK_NAME}-logs"
 
 # Function to check if AWS CLI is installed
 check_aws_cli_installed() {

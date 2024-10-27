@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Variables - replace these with actual values or modify to accept inputs
+INPUT_BUCKET_NAME="audio-transcription-stack-input-us-east-1"         # S3 Bucket for input files
+LAMBDA_FUNCTION_NAME="TranscribeAudioFunction" # Name of the Lambda function
+AWS_REGION="us-east-1"                          # AWS Region
+ACCOUNT_ID="198101904822"                       # AWS Account ID
+
+# Step 1: Add permission for S3 to invoke the Lambda function
+echo "Adding permission to allow S3 to invoke Lambda function $LAMBDA_FUNCTION_NAME..."
+aws lambda add-permission \
+  --function-name "$LAMBDA_FUNCTION_NAME" \
+  --principal s3.amazonaws.com \
+  --statement-id AllowS3Invoke \
+  --action "lambda:InvokeFunction" \
+  --source-arn "arn:aws:s3:::$INPUT_BUCKET_NAME" \
+  --source-account "$ACCOUNT_ID" \
+  --region "$AWS_REGION"
+
+if [ $? -eq 0 ]; then
+    echo "✅ Successfully added invoke permission for S3 to Lambda function."
+else
+    echo "❌ Failed to add invoke permission to Lambda function. Exiting."
+    exit 1
+fi
+
+# Step 2: Set up S3 bucket notification to trigger Lambda on file upload
+echo "Configuring S3 bucket notification for bucket $INPUT_BUCKET_NAME to trigger Lambda function $LAMBDA_FUNCTION_NAME on object creation..."
+
+aws s3api put-bucket-notification-configuration \
+  --bucket "$INPUT_BUCKET_NAME" \
+  --notification-configuration '{
+    "LambdaFunctionConfigurations": [
+      {
+        "Id": "TranscribeAudioTrigger",
+        "LambdaFunctionArn": "arn:aws:lambda:'"$AWS_REGION"':'"$ACCOUNT_ID"':function:'"$LAMBDA_FUNCTION_NAME"'",
+        "Events": ["s3:ObjectCreated:*"],
+        "Filter": {
+          "Key": {
+            "FilterRules": [
+              {"Name": "suffix", "Value": ".mp4"},
+              {"Name": "suffix", "Value": ".mp3"},
+              {"Name": "suffix", "Value": ".wav"}
+            ]
+          }
+        }
+      }
+    ]
+  }'
+
+if [ $? -eq 0 ]; then
+    echo "✅ Successfully configured S3 bucket notification to trigger Lambda function."
+else
+    echo "❌ Failed to configure S3 bucket notification. Exiting."
+    exit 1
+fi
+
+echo "🎉 All actions completed successfully!"
