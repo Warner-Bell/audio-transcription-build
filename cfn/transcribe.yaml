@@ -100,7 +100,6 @@ Resources:
         - Key: Workload
           Value: Transcription
 
-
   # Lambda Function for Audio Transcription Trigger
   TranscribeLambda:
     Type: 'AWS::Lambda::Function'
@@ -127,24 +126,30 @@ Resources:
           def handler(event, context):
               logger.info(f"Received event: {json.dumps(event)}")
               try:
+                  # Extract bucket and key from the event
                   bucket = event['Records'][0]['s3']['bucket']['name']
                   key = event['Records'][0]['s3']['object']['key']
 
+                  # Construct the S3 URI for the audio file
                   audio_file_uri = f"s3://{bucket}/{key}"
                   
-                  # Generate a unique job name using a timestamp
+                  # Generate a base job name by sanitizing the file name
                   base_job_name = re.sub(r'[^0-9a-zA-Z._-]', '_', key.split('.')[0])
+                  
+                  # Append a timestamp to ensure uniqueness
                   timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                  job_name = f"{base_job_name}_{timestamp}"
+                  job_name = f"{base_job_name}_{timestamp}"  # Unique job name
 
+                  # Retrieve environment variables
                   output_bucket = os.environ['OUTPUT_BUCKET']
                   media_format = key.split('.')[-1]
 
+                  # Check if the media format is supported
                   supported_formats = ['mp4', 'mp3', 'wav']
                   if media_format not in supported_formats:
                       raise Exception(f"Unsupported media format: {media_format}")
 
-                  # Start transcription job
+                  # Start the transcription job with the unique job name
                   response = transcribe.start_transcription_job(
                       TranscriptionJobName=job_name,
                       Media={'MediaFileUri': audio_file_uri},
@@ -161,13 +166,24 @@ Resources:
               except Exception as e:
                   logger.error(f"Error processing file {key} in bucket {bucket}: {str(e)}")
                   raise e
+
       Environment:
         Variables:
           OUTPUT_BUCKET: !Ref OutputBucketName
 
       Tags:
-          - Key: Workload
-            Value: Transcription
+        - Key: Workload
+          Value: Transcription
+
+  # Permission for S3 to Invoke the Lambda Function
+  TranscribeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref TranscribeLambda
+      Principal: 's3.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt TranscribeS3Bucket.Arn
 
   # Lambda Log Group Retention Policy
   TranscribeLambdaLogGroup:
