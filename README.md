@@ -5,7 +5,7 @@ Welcome to the **AWS Audio Transcription Automation** project! This CloudFormati
 ## 🚀 Features
 - **Automatic Transcription**: Supports MP4, MP3, and WAV audio files, using Amazon Transcribe.
 - **Secure Storage**: AES-256 encryption for S3 buckets.
-- **Lifecycle Management**: Automatically expire input files after 1 day and log files after 7 days.
+- **Lifecycle Management**: Automatically expire input files after 1 day and log files after 2 days.
 - **Logging**: Logs Lambda function execution and S3 access.
 - **Event-Driven Transcription**: Automatically triggers transcription jobs upon file upload.
 
@@ -35,6 +35,7 @@ This CloudFormation stack provisions the following resources:
 ### Prerequisites
 1. **AWS CLI**: Installed and configured on your local machine.
 2. **AWS Account**: Ensure permissions to create CloudFormation stacks, Lambda functions, and S3 buckets.
+3. **Edit Deploy File**: Edit the `STACK_NAME` constant to a unique name in the `deploy-transcription.sh` file. and also the region in the `s3-trigger.sh` file if not us-east-1.
 
 ### Deploy the Stack
 1. **Clone the repository**:
