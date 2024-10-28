@@ -4,9 +4,20 @@
 INPUT_BUCKET_NAME="transcription-stack-input"         # S3 Bucket for input files
 LAMBDA_FUNCTION_NAME="TranscribeAudioFunction"        # Name of the Lambda function
 AWS_REGION="us-east-1"                                # AWS Region
-ACCOUNT_ID="198101904822"                             # AWS Account ID
 
-# Step 1: Get the Lambda execution role dynamically
+# Step 1: Get the AWS Account ID dynamically
+echo "Retrieving AWS Account ID..."
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text --region "$AWS_REGION")
+
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to retrieve AWS Account ID. Exiting."
+    exit 1
+fi
+
+echo "✅ Retrieved AWS Account ID: $ACCOUNT_ID"
+
+# Step 2: Get the Lambda execution role dynamically
 echo "Retrieving the execution role for Lambda function $LAMBDA_FUNCTION_NAME..."
 
 ROLE_ARN=$(aws lambda get-function-configuration \
@@ -24,7 +35,7 @@ fi
 ROLE_NAME=$(basename "$ROLE_ARN")
 echo "✅ Retrieved Lambda execution role: $ROLE_NAME"
 
-# Step 2: Attach CloudWatch Logs permissions to Lambda execution role
+# Step 3: Attach CloudWatch Logs permissions to Lambda execution role
 echo "Attaching CloudWatch Logs permissions to the Lambda execution role $ROLE_NAME..."
 
 aws iam put-role-policy \
@@ -54,7 +65,7 @@ else
     exit 1
 fi
 
-# Step 3: Set up S3 bucket notification to trigger Lambda on file upload
+# Step 4: Set up S3 bucket notification to trigger Lambda on file upload
 echo "Configuring S3 bucket notification for bucket $INPUT_BUCKET_NAME to trigger Lambda function $LAMBDA_FUNCTION_NAME on object creation..."
 
 aws s3api put-bucket-notification-configuration \
