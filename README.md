@@ -108,7 +108,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 Warner Bell - [Tap In!](https://dot.cards/warnerbell)
 
-Project Link: [S3-Website](https://github.com/Warner-Bell/AWS-S3Hosted-Website-CI_CD)
 
 ## 💚 Enjoyed this project? Help keep them coming!
 
