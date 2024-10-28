@@ -4,7 +4,7 @@
 INPUT_BUCKET_NAME="transcription-stack-input"         # S3 Bucket for input files
 LAMBDA_FUNCTION_NAME="TranscribeAudioFunction" # Name of the Lambda function
 AWS_REGION="us-east-1"                          # AWS Region
-ACCOUNT_ID="198101904822"                       # AWS Account ID
+ACCOUNT_ID="19810190xxxx"                       # AWS Account ID
 
 # Step 1: Add permission for S3 to invoke the Lambda function
 echo "Adding permission to allow S3 to invoke Lambda function $LAMBDA_FUNCTION_NAME..."
