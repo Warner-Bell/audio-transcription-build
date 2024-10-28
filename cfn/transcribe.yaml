@@ -85,7 +85,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:*  # Full S3 access
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
                 Resource:
                   - !Sub "arn:aws:s3:::${InputBucketName}"
                   - !Sub "arn:aws:s3:::${InputBucketName}/*"
