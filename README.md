@@ -56,17 +56,15 @@ This CloudFormation stack provisions the following resources:
    ```bash
    ./bin/s3-trigger.sh
    ```
-   4. **Upload Audio File to S3**:
-   After running the S3 bucket trigger uploaod your files to s3 using `upload-to-s3.sh` Edit the file variables with your info.
-   ```bash
-   ./bin/upload-to-s3.sh
-   ```
 
    > **Note**: The S3 trigger configuration script (`s3-trigger.sh`) is created as a separate script to avoid circular dependencies between the S3 bucket, Lambda function, and logging configuration.
 
 4. **Verify Deployment**: Monitor the deployment progress in the **AWS CloudFormation Console** to ensure all resources are created successfully.
 
-5. **Start Transcribing**: Once deployed, simply upload audio files to the designated input S3 bucket to start transcription.
+5. **Start Transcribing**: Once deployed, simply upload audio files to the designated input S3 bucket to start transcription. After running the S3 bucket trigger upload your files to s3 using `upload-to-s3.sh` (**Edit** the file variables with your info.)
+   ```bash
+   ./bin/upload-to-s3.sh
+   ```
 
 > **Note on Output**: Transcription output files are stored in JSON format in the output S3 bucket. For now, the text needs to be manually copied from the JSON files until the feature update is complete.
 

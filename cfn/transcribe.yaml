@@ -4,7 +4,7 @@ Description: CloudFormation stack to automate transcription of MP4, MP3, and WAV
 Parameters:
   InputBucketName:
     Type: String
-    Description: "The name of the input S3 bucket for audio files (MP4, MP3, WAV)"
+    Description: "The name of the input S3 bucket for audio files (MP4, MP3, .WAV)"
   OutputBucketName:
     Type: String
     Description: "The name of the output S3 bucket for transcription results"
