@@ -3,7 +3,7 @@
 # Script to deploy CloudFormation template
 
 # Constants
-STACK_NAME="flapjack-stack"
+STACK_NAME="Your Stack Name!!!"
 TEMPLATE_FILE="./cfn/transcribe.yaml"
 REGION="us-east-1" # Modify this to your preferred AWS region
 PROFILE="default" # Adjust if using a named profile
