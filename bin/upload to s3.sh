@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Variables
-FILE_PATH="/workspace/audio-transcription-build/audio-samples/sample-3.mp3"             # Local file path (e.g., "/path/to/file.txt")
-BUCKET_NAME="flapjack-stack-input"           # S3 bucket name (e.g., "my-s3-bucket")
+FILE_PATH=""             # Local file path (e.g., "/path/to/file.txt")
+BUCKET_NAME=""           # S3 bucket name (e.g., "my-s3-bucket")
 AWS_REGION="us-east-1"   # AWS region (e.g., "us-east-1")
 S3_KEY=""                # S3 key (optional - if left empty, the original file name will be used)
 
