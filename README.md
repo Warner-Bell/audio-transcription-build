@@ -69,10 +69,12 @@ This CloudFormation stack provisions the following resources:
 
 ```bash
 .
-├── cfn/transcribe.yaml        # CloudFormation template
+├── audio-samples        # 3 sample audio files in mp3, mp4, and wav format
 ├── bin/
 │   ├── deploy-transcription.sh # Deployment script
 │   ├── s3-trigger.sh           # Lambda role configuration and S3 bucket notifications
+    ├── upload-to-s3.sh           # Upload selected audio file to s3
+├── cfn/transcribe.yaml        # CloudFormation template
 ├── README.md                   # Project documentation
 ```
 
