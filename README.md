@@ -81,6 +81,9 @@ This CloudFormation stack provisions the following resources:
 ├── README.md                   # Project documentation
 ```
 
+## Architecture Diagram
+![Transcription Diagram](https://github.com/user-attachments/assets/26da57b0-1d59-405a-9544-6a4e8b5e2fa2)
+
 ## 📊 Monitoring & Logging
 - **CloudWatch Logs**: View Lambda execution logs in the AWS CloudWatch console.
 - **S3 Access Logs**: Access logs for input and output S3 buckets are stored in the logging bucket.
