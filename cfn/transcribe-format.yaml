@@ -145,7 +145,62 @@ Resources:
       Timeout: 600
       Code:
         ZipFile: |
-          # Transcription lambda code here as in original
+          import json
+          import boto3
+          import os
+          import logging
+          import re
+          from datetime import datetime
+
+          s3 = boto3.client('s3')
+          transcribe = boto3.client('transcribe')
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              logger.info(f"Received event: {json.dumps(event)}")
+              try:
+                  # Extract bucket and key from the event
+                  bucket = event['Records'][0]['s3']['bucket']['name']
+                  key = event['Records'][0]['s3']['object']['key']
+
+                  # Construct the S3 URI for the audio file
+                  audio_file_uri = f"s3://{bucket}/{key}"
+                  
+                  # Generate a base job name by sanitizing the file name
+                  base_job_name = re.sub(r'[^0-9a-zA-Z._-]', '_', key.split('.')[0])
+                  
+                  # Append a timestamp to ensure uniqueness
+                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                  job_name = f"{base_job_name}_{timestamp}"  # Unique job name
+
+                  # Retrieve environment variables
+                  output_bucket = os.environ['OUTPUT_BUCKET']
+                  media_format = key.split('.')[-1]
+
+                  # Check if the media format is supported
+                  supported_formats = ['mp4', 'mp3', 'wav']
+                  if media_format not in supported_formats:
+                      raise Exception(f"Unsupported media format: {media_format}")
+
+                  # Start the transcription job with the unique job name
+                  response = transcribe.start_transcription_job(
+                      TranscriptionJobName=job_name,
+                      Media={'MediaFileUri': audio_file_uri},
+                      MediaFormat=media_format,
+                      LanguageCode='en-US',
+                      OutputBucketName=output_bucket
+                  )
+                  logger.info(f"Started transcription job {job_name}")
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps(f"Started transcription job {job_name}")
+                  }
+              except Exception as e:
+                  logger.error(f"Error processing file {key} in bucket {bucket}: {str(e)}")
+                  raise e
+     
       Environment:
         Variables:
           OUTPUT_BUCKET: !Ref OutputBucketName
@@ -158,7 +213,7 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       FunctionName: "FormatTranscriptionFunction"
-      Handler: format_handler.lambda_handler
+      Handler: index.lambda_handler
       Role: !GetAtt TranscribeLambdaRole.Arn
       Runtime: python3.9
       Timeout: 300
@@ -167,8 +222,6 @@ Resources:
           import boto3
           import json
           import os
-          from docx import Document
-          from datetime import datetime
 
           s3 = boto3.client('s3')
 
@@ -185,25 +238,28 @@ Resources:
               with open(temp_file, 'r') as f:
                   transcription_data = json.load(f)
               
-              # Extract and format transcription text
-              document = Document()
-              document.add_heading('Transcription', level=1)
+              # Format as HTML
+              html_content = "<html><head><title>Transcription</title></head><body>"
+              html_content += "<h1>Transcription</h1>"
               
               for item in transcription_data.get('results', {}).get('transcripts', []):
-                  document.add_paragraph(item['transcript'])
+                  html_content += f"<p>{item['transcript']}</p>"
               
-              # Save document as Word file
-              output_key = key.replace('.json', '.docx')
+              html_content += "</body></html>"
+
+              # Save as HTML file
+              output_key = key.replace('.json', '.html')
               output_path = '/tmp/' + output_key
-              document.save(output_path)
+              with open(output_path, 'w') as f:
+                  f.write(html_content)
               
-              # Upload Word document to formatted output bucket
+              # Upload the HTML file to the formatted output bucket
               formatted_bucket = os.environ['FORMATTED_BUCKET']
               s3.upload_file(output_path, formatted_bucket, output_key)
               
               return {
                   'statusCode': 200,
-                  'body': json.dumps(f"Formatted document saved to {formatted_bucket}/{output_key}")
+                  'body': json.dumps(f"Formatted HTML saved to {formatted_bucket}/{output_key}")
               }
 
       Environment:
@@ -212,6 +268,24 @@ Resources:
       Tags:
         - Key: Workload
           Value: Transcription
+  
+  # Permission for S3 to Invoke the Lambda Function
+  TranscribeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref TranscribeLambda
+      Principal: 's3.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt TranscribeS3Bucket.Arn
+
+  # Lambda Log Group Retention Policy
+  TranscribeLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TranscribeLambda}"
+      RetentionInDays: 1  # Set to a valid retention period
+
 
   # Permission for S3 to Invoke the Formatting Lambda Function
   FormatLambdaPermission:
@@ -243,10 +317,10 @@ Outputs:
     Description: "S3 bucket where formatted Word documents are stored"
     Value: !Ref FormattedOutputBucket
 
-  LambdaFunctionARN:
-    Description: "ARN of the Transcription Lambda Function"
-    Value: !GetAtt TranscribeLambda.Arn
+  LambdaFunctionName:
+    Description: "Name of the Transcription Lambda Function"
+    Value: !Ref TranscribeLambda
 
-  FormatLambdaFunctionARN:
-    Description: "ARN of the Formatting Lambda Function"
-    Value: !GetAtt FormatTranscriptionLambda.Arn
+  FormatLambdaFunctionName:
+    Description: "Name of the Formatting Lambda Function"
+    Value: !Ref FormatTranscriptionLambda

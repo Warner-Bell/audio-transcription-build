@@ -1,10 +1,27 @@
 #!/bin/bash
 
 # Variables
-FILE_PATH=""             # Local file path (e.g., "/path/to/file.txt")
-BUCKET_NAME=""           # S3 bucket name (e.g., "my-s3-bucket")
+FILE_PATH="/workspace/audio-transcription-build/audio-samples/sample.wav"            # Local file path (e.g., "/path/to/file.txt")
 AWS_REGION="us-east-1"   # AWS region (e.g., "us-east-1")
 S3_KEY=""                # S3 key (optional - if left empty, the original file name will be used)
+
+# Step 1: Retrieve the latest CloudFormation stack name
+echo "Retrieving the first created CloudFormation stack name..."
+
+STACK_NAME=$(aws cloudformation describe-stacks \
+  --query "Stacks | sort_by(@, &CreationTime) | [-2].StackName" \
+  --output text \
+  --region "$AWS_REGION")
+
+if [ -z "$STACK_NAME" ]; then
+  echo "❌ No CloudFormation stack found. Exiting."
+  exit 1
+fi
+
+echo "✅ Retrieved Stack Name: $STACK_NAME"
+
+# Define variables based on retrieved stack name
+BUCKET_NAME="${STACK_NAME}-input"         # S3 Bucket for input files
 
 # Check if FILE_PATH and BUCKET_NAME are provided
 if [ -z "$FILE_PATH" ] || [ -z "$BUCKET_NAME" ]; then

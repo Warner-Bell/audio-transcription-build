@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Constants
-STACK_NAME="YourStackName"           # CloudFormation Stack Name
-TEMPLATE_FILE="./cfn/transcribe.yaml" # CloudFormation template file path
+STACK_NAME="Your Stack Name!!!"           # CloudFormation Stack Name
+TEMPLATE_FILE="./cfn/transcribe-format.yaml" # CloudFormation template file path
 REGION="us-east-1"                   # Modify to preferred AWS region
 PROFILE="default"                    # Adjust for named profile if required
 
@@ -22,9 +22,18 @@ check_aws_cli_installed() {
 
 # Function to validate parameters
 validate_parameters() {
-    if [[ -z "$STACK_NAME" || -z "$REGION" ]]; then
-        echo "❌ STACK_NAME or REGION is not defined. Please set and try again."
+    if [[ -z "$STACK_NAME" ]]; then
+        echo "❌ STACK_NAME is not defined. Please set STACK_NAME and try again."
         exit 1
+    fi
+
+    if [[ -z "$REGION" ]]; then
+        echo "❌ REGION is not defined. Please set REGION and try again."
+        exit 1
+    fi
+
+    if [[ -z "$PROFILE" ]]; then
+        echo "⚠️ AWS_PROFILE is not set. Using the default profile."
     fi
 }
 
@@ -60,103 +69,6 @@ deploy_stack() {
     fi
 }
 
-# Set up S3 notifications and IAM permissions for Lambdas
-configure_s3_notifications_and_permissions() {
-    echo "🔄 Configuring S3 bucket notifications and permissions..."
-
-    # Retrieve Account ID
-    ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text --region "$REGION")
-
-    # Retrieve Lambda role for permissions
-    LAMBDA_ROLE_ARN=$(aws lambda get-function-configuration --function-name TranscribeAudioFunction --query "Role" --output text --region "$REGION")
-    FORMAT_LAMBDA_ROLE_ARN=$(aws lambda get-function-configuration --function-name FormatTranscriptionFunction --query "Role" --output text --region "$REGION")
-
-    # Attach policy for both Lambda roles to access all buckets
-    aws iam put-role-policy \
-        --role-name $(basename "$LAMBDA_ROLE_ARN") \
-        --policy-name "FullLambdaPermissions" \
-        --policy-document '{
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
-                    "Resource": [
-                        "arn:aws:s3:::'"$INPUT_BUCKET_NAME"'",
-                        "arn:aws:s3:::'"$INPUT_BUCKET_NAME"'/*",
-                        "arn:aws:s3:::'"$OUTPUT_BUCKET_NAME"'",
-                        "arn:aws:s3:::'"$OUTPUT_BUCKET_NAME"'/*",
-                        "arn:aws:s3:::'"$FORMATTED_BUCKET_NAME"'",
-                        "arn:aws:s3:::'"$FORMATTED_BUCKET_NAME"'/*"
-                    ]
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-                    "Resource": [
-                        "arn:aws:logs:'"$REGION"':'"$ACCOUNT_ID"':log-group:/aws/lambda/TranscribeAudioFunction*",
-                        "arn:aws:logs:'"$REGION"':'"$ACCOUNT_ID"':log-group:/aws/lambda/FormatTranscriptionFunction*"
-                    ]
-                }
-            ]
-        }'
-
-    if [ $? -eq 0 ]; then
-        echo "✅ Successfully updated permissions for both Lambda functions."
-    else
-        echo "❌ Failed to update Lambda permissions."
-        exit 1
-    fi
-
-    # Configure S3 notification for input bucket to trigger Transcribe Lambda
-    aws s3api put-bucket-notification-configuration \
-        --bucket "$INPUT_BUCKET_NAME" \
-        --notification-configuration '{
-            "LambdaFunctionConfigurations": [
-                {
-                    "Id": "TranscribeAudioTrigger",
-                    "LambdaFunctionArn": "arn:aws:lambda:'"$REGION"':'"$ACCOUNT_ID"':function:TranscribeAudioFunction",
-                    "Events": ["s3:ObjectCreated:*"],
-                    "Filter": {
-                        "Key": {
-                            "FilterRules": [
-                                {"Name": "suffix", "Value": ".mp4"},
-                                {"Name": "suffix", "Value": ".mp3"},
-                                {"Name": "suffix", "Value": ".wav"}
-                            ]
-                        }
-                    }
-                }
-            ]
-        }'
-
-    # Configure S3 notification for output bucket to trigger Format Lambda
-    aws s3api put-bucket-notification-configuration \
-        --bucket "$OUTPUT_BUCKET_NAME" \
-        --notification-configuration '{
-            "LambdaFunctionConfigurations": [
-                {
-                    "Id": "FormatTranscriptionTrigger",
-                    "LambdaFunctionArn": "arn:aws:lambda:'"$REGION"':'"$ACCOUNT_ID"':function:FormatTranscriptionFunction",
-                    "Events": ["s3:ObjectCreated:*"],
-                    "Filter": {
-                        "Key": {
-                            "FilterRules": [
-                                {"Name": "suffix", "Value": ".json"}
-                            ]
-                        }
-                    }
-                }
-            ]
-        }'
-
-    if [ $? -eq 0 ]; then
-        echo "✅ S3 notifications configured successfully."
-    else
-        echo "❌ Failed to configure S3 notifications."
-        exit 1
-    fi
-}
 
 # Notify upon completion (optional)
 notify_completion() {
@@ -180,9 +92,6 @@ main() {
 
     # Deploy the stack
     deploy_stack
-
-    # Configure S3 notifications and permissions
-    configure_s3_notifications_and_permissions
 
     # Notify upon successful completion
     notify_completion
