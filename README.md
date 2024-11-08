@@ -118,7 +118,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 🏆 Acknowledgements
 - Thanks to **AWS** for their robust services. 💪
-- Special thanks to **OpenAI** for inspiring innovation with AI-based projects. 🙌
+- Special thanks to **OpenAI** for inspiring innovation with AI-based tools. 🙌
 
 ## 📬 Contact
 
