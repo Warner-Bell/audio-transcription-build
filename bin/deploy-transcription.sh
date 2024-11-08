@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Constants
-STACK_NAME="YOUR-STACK-NAME!!!"    # CloudFormation Stack Name with timestamp appended
+STACK_NAME="your-stack-name"    # Input a CloudFormation Stack Name (IT MUST BE ALL LOWERCASE!!!)
 TEMPLATE_FILE="./cfn/audio-transcription.yaml" # CloudFormation template file path
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")           # Generates a timestamp in the format YYYYMMDDHHMMSS
 REGION="us-east-1"                          # Modify to preferred AWS region

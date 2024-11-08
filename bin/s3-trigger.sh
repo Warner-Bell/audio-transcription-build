@@ -24,9 +24,10 @@ echo "Retrieving S3 bucket names with base name pattern '${STACK_NAME}'..."
 INPUT_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-input')].Name | [0]" --output text)
 OUTPUT_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-output')].Name | [0]" --output text)
 FORMATTED_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-formatted')].Name | [0]" --output text)
+LOG_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-logs')].Name | [0]" --output text)
 
 # Check if bucket names were retrieved
-if [ "$INPUT_BUCKET_NAME" == "None" ] || [ "$OUTPUT_BUCKET_NAME" == "None" ] || [ "$FORMATTED_BUCKET_NAME" == "None" ]; then
+if [ "$INPUT_BUCKET_NAME" == "None" ] || [ "$OUTPUT_BUCKET_NAME" == "None" ] || [ "$FORMATTED_BUCKET_NAME" == "None" ] || [ "$LOG_BUCKET_NAME" == "None" ]; then
   echo "❌ Failed to retrieve one or more bucket names. Check if the buckets exist with the specified naming pattern."
   exit 1
 fi
@@ -36,6 +37,7 @@ echo "✅ Retrieved S3 bucket names:"
 echo "INPUT_BUCKET_NAME: $INPUT_BUCKET_NAME"
 echo "OUTPUT_BUCKET_NAME: $OUTPUT_BUCKET_NAME"
 echo "FORMATTED_BUCKET_NAME: $FORMATTED_BUCKET_NAME"
+echo "LOG_BUCKET_NAME: $LOG_BUCKET_NAME"
 
 LAMBDA_FUNCTION_NAME="TranscribeAudioFunction"   # Name of the Transcription Lambda function
 FORMAT_LAMBDA_NAME="FormatTranscriptionFunction" # Name of the Formatting Lambda function
@@ -69,6 +71,35 @@ fi
 # Extract the role name from the ARN
 ROLE_NAME=$(basename "$ROLE_ARN")
 echo "✅ Retrieved Lambda execution role: $ROLE_NAME"
+
+# Attach a bucket policy to the logs bucket to allow access logging from input and output buckets
+echo "Attaching bucket policy to $LOG_BUCKET_NAME to allow access logging..."
+
+aws s3api put-bucket-policy \
+  --bucket "$LOG_BUCKET_NAME" \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": "s3:PutObject",
+        "Resource": "arn:aws:s3:::'"$LOG_BUCKET_NAME"'/transcribe-access-logs/*",
+        "Condition": {
+          "StringEquals": {
+            "aws:SourceAccount": "'"$ACCOUNT_ID"'"
+          }
+        }
+      }
+    ]
+  }'
+
+if [ $? -eq 0 ]; then
+    echo "✅ Successfully attached bucket policy to $LOG_BUCKET_NAME."
+else
+    echo "❌ Failed to attach bucket policy to $LOG_BUCKET_NAME. Exiting."
+    exit 1
+fi
 
 # Step 4: Attach CloudWatch Logs permissions to Lambda execution role
 echo "Attaching CloudWatch Logs permissions to the Lambda execution role $ROLE_NAME..."

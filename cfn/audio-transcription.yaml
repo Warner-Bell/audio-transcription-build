@@ -19,6 +19,7 @@ Resources:
   # S3 Bucket for Input Files (MP4, MP3, WAV)
   TranscribeS3Bucket:
     Type: 'AWS::S3::Bucket'
+    DependsOn: TranscribeS3LogBucket  # Ensures creation after the logs bucket
     Properties:
       BucketName: !Ref InputBucketName
       BucketEncryption:
@@ -39,6 +40,7 @@ Resources:
   # S3 Bucket for Transcription Output
   TranscribeOutputBucket:
     Type: 'AWS::S3::Bucket'
+    DependsOn: TranscribeS3LogBucket  # Ensures creation after the logs bucket
     Properties:
       BucketName: !Ref OutputBucketName
       BucketEncryption:
@@ -56,6 +58,7 @@ Resources:
   # New S3 Bucket for Formatted Word Documents
   FormattedOutputBucket:
     Type: 'AWS::S3::Bucket'
+    DependsOn: TranscribeS3LogBucket  # Ensures creation after the logs bucket
     Properties:
       BucketName: !Ref FormattedOutputBucketName
       BucketEncryption:
