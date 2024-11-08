@@ -1,7 +1,3 @@
-Here's the updated README with the additional details about the HTML output and the `STACK_NAME` variable configuration.
-
----
-
 # 🎧 AWS Audio Transcription Automation with CloudFormation
 
 Welcome to the **AWS Audio Transcription Automation** project! This CloudFormation stack automates transcription of audio files (MP4, MP3, and WAV) using **Amazon Transcribe**. Easily upload your audio files to S3, trigger transcription jobs, and store results in an output S3 bucket — all automated! 🎉
