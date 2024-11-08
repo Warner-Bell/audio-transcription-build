@@ -6,6 +6,10 @@ Here's the updated README with the additional details about the HTML output and 
 
 Welcome to the **AWS Audio Transcription Automation** project! This CloudFormation stack automates transcription of audio files (MP4, MP3, and WAV) using **Amazon Transcribe**. Easily upload your audio files to S3, trigger transcription jobs, and store results in an output S3 bucket — all automated! 🎉
 
+## Architecture Diagram
+![Transcription Diagram drawio (1)](https://github.com/user-attachments/assets/8115996f-cb36-4369-a941-70154fa51435)
+
+
 ## 🚀 Features
 - **Automatic Transcription**: Supports MP4, MP3, and WAV audio files, using Amazon Transcribe.
 - **Secure Storage**: AES-256 encryption for S3 buckets.
@@ -86,9 +90,6 @@ This CloudFormation stack provisions the following resources:
 ├── cfn/audio-transcription.yaml         # CloudFormation template
 ├── README.md                   # Project documentation
 ```
-
-## Architecture Diagram
-![Transcription Diagram](https://github.com/user-attachments/assets/26da57b0-1d59-405a-9544-6a4e8b5e2fa2)
 
 ## 📊 Monitoring & Logging
 - **CloudWatch Logs**: View Lambda execution logs in the AWS CloudWatch console.
