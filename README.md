@@ -1,6 +1,14 @@
+Here's the updated README with the additional details about the HTML output and the `STACK_NAME` variable configuration.
+
+---
+
 # 🎧 AWS Audio Transcription Automation with CloudFormation
 
 Welcome to the **AWS Audio Transcription Automation** project! This CloudFormation stack automates transcription of audio files (MP4, MP3, and WAV) using **Amazon Transcribe**. Easily upload your audio files to S3, trigger transcription jobs, and store results in an output S3 bucket — all automated! 🎉
+
+## Architecture Diagram
+![Transcription Diagram drawio (1)](https://github.com/user-attachments/assets/8115996f-cb36-4369-a941-70154fa51435)
+
 
 ## 🚀 Features
 - **Automatic Transcription**: Supports MP4, MP3, and WAV audio files, using Amazon Transcribe.
@@ -8,6 +16,7 @@ Welcome to the **AWS Audio Transcription Automation** project! This CloudFormati
 - **Lifecycle Management**: Automatically expire input files after 1 day and log files after 2 days.
 - **Logging**: Logs Lambda function execution and S3 access.
 - **Event-Driven Transcription**: Automatically triggers transcription jobs upon file upload.
+- **Final HTML Output**: Transcription results are processed into an HTML file, viewable on any browser for easy reading.
 
 ## 🛠️ Technology Stack
 - **Amazon S3**: Storage for audio files, transcription results, and access logs.
@@ -19,7 +28,7 @@ Welcome to the **AWS Audio Transcription Automation** project! This CloudFormati
 ## 🎯 How It Works
 1. **Upload** audio files (MP4, MP3, or WAV) to the designated S3 input bucket.
 2. **Lambda Triggered**: Upon upload, a Lambda function triggers an Amazon Transcribe job.
-3. **Transcription Results**: Transcription results are stored in the specified S3 output bucket.
+3. **Transcription Results**: Transcription results are stored in the specified S3 output bucket, and formatted as an HTML file for easy viewing.
 
 ## 🧩 CloudFormation Resources
 This CloudFormation stack provisions the following resources:
@@ -35,7 +44,7 @@ This CloudFormation stack provisions the following resources:
 ### Prerequisites
 1. **AWS CLI**: Installed and configured on your local machine.
 2. **AWS Account**: Ensure permissions to create CloudFormation stacks, Lambda functions, and S3 buckets.
-3. **Edit Deploy File**: Edit the `STACK_NAME` constant to a unique name in the `deploy-transcription.sh` file. and also the region in the `s3-trigger.sh` file if not us-east-1.
+3. **Edit Deploy File**: Edit the `STACK_NAME` constant to a unique name in the `deploy-transcription.sh` file. Update the region in the `s3-trigger.sh` file if your region is not `us-east-1`.
 
 ### Deploy the Stack
 1. **Clone the repository**:
@@ -61,12 +70,12 @@ This CloudFormation stack provisions the following resources:
 
 4. **Verify Deployment**: Monitor the deployment progress in the **AWS CloudFormation Console** to ensure all resources are created successfully.
 
-5. **Start Transcribing**: Once deployed, simply upload audio files to the designated input S3 bucket to start transcription. After running the S3 bucket trigger upload your files to s3 using `upload-to-s3.sh` (**Edit** the file variables with your info.)
+5. **Start Transcribing**: Once deployed, simply upload audio files to the designated input S3 bucket to start transcription. After running the S3 bucket trigger, upload your files to S3 using `upload-to-s3.sh` (**Edit** the file variables with your info.)
    ```bash
    ./bin/upload-to-s3.sh
    ```
 
-> **Note on Output**: Transcription output files are stored in JSON format in the output S3 bucket. For now, the text needs to be manually copied from the JSON files until the feature update is complete.
+> **Note on Output**: Transcription output files are stored in both JSON and HTML format in the output S3 bucket. The HTML format can be viewed directly in any web browser for easy reading, eliminating the need to manually copy text from JSON files.
 
 ## 📂 Project Structure
 
@@ -75,14 +84,12 @@ This CloudFormation stack provisions the following resources:
 ├── audio-samples        # 3 sample audio files in mp3, mp4, and wav format
 ├── bin/
 │   ├── deploy-transcription.sh # Deployment script
+│   ├── empty-buckets.sh        # Empty all Project Buckets
 │   ├── s3-trigger.sh           # Lambda role configuration and S3 bucket notifications
-    ├── upload-to-s3.sh           # Upload selected audio file to s3
-├── cfn/transcribe.yaml        # CloudFormation template
+│   ├── upload-to-s3.sh         # Upload selected audio file to s3
+├── cfn/audio-transcription.yaml         # CloudFormation template
 ├── README.md                   # Project documentation
 ```
-
-## Architecture Diagram
-![Transcription Diagram](https://github.com/user-attachments/assets/26da57b0-1d59-405a-9544-6a4e8b5e2fa2)
 
 ## 📊 Monitoring & Logging
 - **CloudWatch Logs**: View Lambda execution logs in the AWS CloudWatch console.
