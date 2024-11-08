@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Variables
-FILE_PATH="/workspace/audio-transcription-build/audio-samples/sample.wav"            # Local file path (e.g., "/path/to/file.txt")
-AWS_REGION="us-east-1"   # AWS region (e.g., "us-east-1")
-S3_KEY=""                # S3 key (optional - if left empty, the original file name will be used)
+FOLDER_PATH="/workspace/audio-transcription-build/audio-samples/"  # Local folder path to upload (e.g., "/path/to/folder/")
+AWS_REGION="us-east-1"                                             # AWS region (e.g., "us-east-1")
+S3_PREFIX=""                                                       # S3 prefix for the folder in the bucket (optional)
 
 # Step 1: Retrieve the latest CloudFormation stack name
 echo "Retrieving the first created CloudFormation stack name..."
 
 STACK_NAME=$(aws cloudformation describe-stacks \
-  --query "Stacks | sort_by(@, &CreationTime) | [-2].StackName" \
+  --query "Stacks | sort_by(@, &CreationTime) | [-1].StackName" \
   --output text \
   --region "$AWS_REGION")
 
@@ -20,29 +20,35 @@ fi
 
 echo "✅ Retrieved Stack Name: $STACK_NAME"
 
-# Define variables based on retrieved stack name
-BUCKET_NAME="${STACK_NAME}-input"         # S3 Bucket for input files
+# Retrieve the latest bucket names based on the base stack name
+echo "Retrieving S3 bucket names with base name pattern '${STACK_NAME}'..."
 
-# Check if FILE_PATH and BUCKET_NAME are provided
-if [ -z "$FILE_PATH" ] || [ -z "$BUCKET_NAME" ]; then
-    echo "❌ FILE_PATH and BUCKET_NAME are required. Please set these variables and try again."
+INPUT_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-input')].Name | [0]" --output text)
+
+# Check if the bucket name was retrieved
+if [ "$INPUT_BUCKET_NAME" == "None" ]; then
+  echo "❌ Failed to retrieve the input bucket name. Check if the bucket exists with the specified naming pattern."
+  exit 1
+fi
+
+# Display retrieved bucket name
+echo "✅ Retrieved S3 bucket name: $INPUT_BUCKET_NAME"
+
+# Check if FOLDER_PATH and INPUT_BUCKET_NAME are provided
+if [ -z "$FOLDER_PATH" ] || [ -z "$INPUT_BUCKET_NAME" ]; then
+    echo "❌ FOLDER_PATH and INPUT_BUCKET_NAME are required. Please set these variables and try again."
     exit 1
 fi
 
-# Set S3_KEY to the original file name if not provided
-if [ -z "$S3_KEY" ]; then
-    S3_KEY=$(basename "$FILE_PATH")
-fi
+# Upload all files in the specified folder to the S3 bucket
+echo "🚀 Uploading contents of $FOLDER_PATH to s3://$INPUT_BUCKET_NAME/$S3_PREFIX in region $AWS_REGION..."
 
-# Upload file to S3
-echo "🚀 Uploading $FILE_PATH to s3://$BUCKET_NAME/$S3_KEY in region $AWS_REGION..."
-
-aws s3 cp "$FILE_PATH" "s3://$BUCKET_NAME/$S3_KEY" --region "$AWS_REGION"
+aws s3 cp "$FOLDER_PATH" "s3://$INPUT_BUCKET_NAME/$S3_PREFIX" --recursive --region "$AWS_REGION"
 
 # Check if the upload was successful
 if [ $? -eq 0 ]; then
-    echo "✅ Successfully uploaded $FILE_PATH to s3://$BUCKET_NAME/$S3_KEY"
+    echo "✅ Successfully uploaded contents of $FOLDER_PATH to s3://$INPUT_BUCKET_NAME/$S3_PREFIX"
 else
-    echo "❌ Failed to upload $FILE_PATH to S3."
+    echo "❌ Failed to upload contents of $FOLDER_PATH to S3."
     exit 1
 fi

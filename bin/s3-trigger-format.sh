@@ -18,10 +18,25 @@ fi
 
 echo "✅ Retrieved Stack Name: $STACK_NAME"
 
-# Define variables based on retrieved stack name
-INPUT_BUCKET_NAME="${STACK_NAME}-input"          # S3 Bucket for input files
-OUTPUT_BUCKET_NAME="${STACK_NAME}-output"        # S3 Bucket for transcription output files
-FORMATTED_BUCKET_NAME="${STACK_NAME}-formatted"  # S3 Bucket for formatted Word documents
+# Retrieve the latest bucket names based on the base stack name
+echo "Retrieving S3 bucket names with base name pattern '${STACK_NAME}'..."
+
+INPUT_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-input')].Name | [0]" --output text)
+OUTPUT_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-output')].Name | [0]" --output text)
+FORMATTED_BUCKET_NAME=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${STACK_NAME}-') && ends_with(Name, '-formatted')].Name | [0]" --output text)
+
+# Check if bucket names were retrieved
+if [ "$INPUT_BUCKET_NAME" == "None" ] || [ "$OUTPUT_BUCKET_NAME" == "None" ] || [ "$FORMATTED_BUCKET_NAME" == "None" ]; then
+  echo "❌ Failed to retrieve one or more bucket names. Check if the buckets exist with the specified naming pattern."
+  exit 1
+fi
+
+# Display retrieved bucket names
+echo "✅ Retrieved S3 bucket names:"
+echo "INPUT_BUCKET_NAME: $INPUT_BUCKET_NAME"
+echo "OUTPUT_BUCKET_NAME: $OUTPUT_BUCKET_NAME"
+echo "FORMATTED_BUCKET_NAME: $FORMATTED_BUCKET_NAME"
+
 LAMBDA_FUNCTION_NAME="TranscribeAudioFunction"   # Name of the Transcription Lambda function
 FORMAT_LAMBDA_NAME="FormatTranscriptionFunction" # Name of the Formatting Lambda function
 

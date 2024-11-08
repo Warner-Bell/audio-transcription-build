@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # Constants
-STACK_NAME="Your Stack Name!!!"           # CloudFormation Stack Name
-TEMPLATE_FILE="./cfn/transcribe-format.yaml" # CloudFormation template file path
-REGION="us-east-1"                   # Modify to preferred AWS region
-PROFILE="default"                    # Adjust for named profile if required
+STACK_NAME="YOUR-STACK-NAME!!!"    # CloudFormation Stack Name with timestamp appended
+TEMPLATE_FILE="./cfn/audio-transcription.yaml" # CloudFormation template file path
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")           # Generates a timestamp in the format YYYYMMDDHHMMSS
+REGION="us-east-1"                          # Modify to preferred AWS region
+PROFILE="default"                           # Adjust for named profile if required
 
 # Bucket names
-INPUT_BUCKET_NAME="${STACK_NAME}-input"
-OUTPUT_BUCKET_NAME="${STACK_NAME}-output"
-LOG_BUCKET_NAME="${STACK_NAME}-logs"
-FORMATTED_BUCKET_NAME="${STACK_NAME}-formatted"
+INPUT_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-input"
+OUTPUT_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-output"
+LOG_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-logs"
+FORMATTED_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-formatted"
 
 # Function to check if AWS CLI is installed
 check_aws_cli_installed() {
