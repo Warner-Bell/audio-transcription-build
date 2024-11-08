@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Script to deploy CloudFormation template
-
 # Constants
-STACK_NAME="Your Stack Name!!!"
-TEMPLATE_FILE="./cfn/transcribe.yaml"
-REGION="us-east-1" # Modify this to your preferred AWS region
-PROFILE="default" # Adjust if using a named profile
+STACK_NAME="YOUR-STACK-NAME!!!"    # CloudFormation Stack Name with timestamp appended
+TEMPLATE_FILE="./cfn/audio-transcription.yaml" # CloudFormation template file path
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")           # Generates a timestamp in the format YYYYMMDDHHMMSS
+REGION="us-east-1"                          # Modify to preferred AWS region
+PROFILE="default"                           # Adjust for named profile if required
 
 # Bucket names
-INPUT_BUCKET_NAME="${STACK_NAME}-input"
-OUTPUT_BUCKET_NAME="${STACK_NAME}-output"
-LOG_BUCKET_NAME="${STACK_NAME}-logs"
+INPUT_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-input"
+OUTPUT_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-output"
+LOG_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-logs"
+FORMATTED_BUCKET_NAME="${STACK_NAME}-${TIMESTAMP}-formatted"
 
 # Function to check if AWS CLI is installed
 check_aws_cli_installed() {
@@ -46,10 +46,10 @@ check_template_file_exists() {
     fi
 }
 
-# Function to deploy CloudFormation stack
+# Deploy CloudFormation stack
 deploy_stack() {
     echo "🚀 Deploying CloudFormation stack: $STACK_NAME..."
-
+    
     aws cloudformation deploy \
         --template-file "$TEMPLATE_FILE" \
         --stack-name "$STACK_NAME" \
@@ -59,7 +59,8 @@ deploy_stack() {
         --parameter-overrides \
             InputBucketName="$INPUT_BUCKET_NAME" \
             OutputBucketName="$OUTPUT_BUCKET_NAME" \
-            LogBucketName="$LOG_BUCKET_NAME"
+            LogBucketName="$LOG_BUCKET_NAME" \
+            FormattedOutputBucketName="$FORMATTED_BUCKET_NAME"
 
     if [ $? -eq 0 ]; then
         echo "✅ CloudFormation stack '$STACK_NAME' deployed successfully!"
@@ -69,12 +70,13 @@ deploy_stack() {
     fi
 }
 
-# Function to notify upon completion (optional)
+
+# Notify upon completion (optional)
 notify_completion() {
     if command -v notify-send &> /dev/null; then
-        notify-send "CloudFormation Deployment" "Stack $STACK_NAME deployed successfully!" --urgency=normal
+        notify-send "CloudFormation Deployment" "Stack $STACK_NAME deployed and configured successfully!" --urgency=normal
     else
-        echo "ℹ️ Consider installing 'notify-send' for notifications on Linux."
+        echo "ℹ️ Consider installing 'notify-send' for desktop notifications."
     fi
 }
 

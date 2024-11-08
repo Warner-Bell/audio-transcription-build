@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation stack to automate transcription of MP4, MP3, and WAV audio using Amazon Transcribe.
+Description: CloudFormation stack to automate transcription of MP4, MP3, and WAV audio using Amazon Transcribe and format transcription output into Word document.
 
 Parameters:
   InputBucketName:
@@ -11,21 +11,24 @@ Parameters:
   LogBucketName:
     Type: String
     Description: "The name of the S3 bucket for storing logs"
+  FormattedOutputBucketName:
+    Type: String
+    Description: "The name of the S3 bucket to store formatted Word documents"
 
 Resources:
   # S3 Bucket for Input Files (MP4, MP3, WAV)
   TranscribeS3Bucket:
     Type: 'AWS::S3::Bucket'
-    Properties: 
+    Properties:
       BucketName: !Ref InputBucketName
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256  # Enforce AES256 encryption
+              SSEAlgorithm: AES256
       LifecycleConfiguration:
         Rules:
           - Status: Enabled
-            ExpirationInDays: 1  # Expire input files after 1 day
+            ExpirationInDays: 1
       LoggingConfiguration:
         DestinationBucketName: !Ref LogBucketName
         LogFilePrefix: "transcribe-access-logs/"
@@ -41,11 +44,28 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256  # Enforce AES256 encryption
+              SSEAlgorithm: AES256
       LifecycleConfiguration:
         Rules:
           - Status: Enabled
-            ExpirationInDays: 1  # Expire output files after 1 day
+            ExpirationInDays: 1
+      Tags:
+        - Key: Workload
+          Value: Transcription
+
+  # New S3 Bucket for Formatted Word Documents
+  FormattedOutputBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref FormattedOutputBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 7  # Adjust as needed
       Tags:
         - Key: Workload
           Value: Transcription
@@ -58,16 +78,16 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256  # Enforce AES256 encryption for logging bucket
+              SSEAlgorithm: AES256
       LifecycleConfiguration:
         Rules:
           - Status: Enabled
-            ExpirationInDays: 2  # Expire logs after 2 days
+            ExpirationInDays: 2
       Tags:
         - Key: Workload
           Value: Transcription
 
-  # IAM Role for Lambda Function to Access S3 and Transcribe
+  # IAM Role for Lambda Functions
   TranscribeLambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -83,6 +103,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # S3 permissions for input and output buckets
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -93,16 +114,27 @@ Resources:
                   - !Sub "arn:aws:s3:::${InputBucketName}/*"
                   - !Sub "arn:aws:s3:::${OutputBucketName}"
                   - !Sub "arn:aws:s3:::${OutputBucketName}/*"
+                  - !Sub "arn:aws:s3:::${FormattedOutputBucketName}"
+                  - !Sub "arn:aws:s3:::${FormattedOutputBucketName}/*"
+              # Transcribe permissions for job control
               - Effect: Allow
                 Action:
                   - transcribe:StartTranscriptionJob
                   - transcribe:GetTranscriptionJob
-                Resource: "*"  # Transcribe permissions for all jobs
+                Resource: "*"
+              # CloudWatch Logs permissions
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+
       Tags:
         - Key: Workload
           Value: Transcription
 
-  # Lambda Function for Audio Transcription Trigger
+  # Lambda Function for Transcription
   TranscribeLambda:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -168,15 +200,75 @@ Resources:
               except Exception as e:
                   logger.error(f"Error processing file {key} in bucket {bucket}: {str(e)}")
                   raise e
-
+     
       Environment:
         Variables:
           OUTPUT_BUCKET: !Ref OutputBucketName
-
       Tags:
         - Key: Workload
           Value: Transcription
 
+  # Lambda Function for Formatting Transcription Output to Word Document
+  FormatTranscriptionLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: "FormatTranscriptionFunction"
+      Handler: index.lambda_handler
+      Role: !GetAtt TranscribeLambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import os
+
+          s3 = boto3.client('s3')
+
+          def lambda_handler(event, context):
+              # Retrieve bucket and key from S3 event
+              bucket = event['Records'][0]['s3']['bucket']['name']
+              key = event['Records'][0]['s3']['object']['key']
+
+              # Download transcription JSON file
+              temp_file = '/tmp/transcription.json'
+              s3.download_file(bucket, key, temp_file)
+              
+              # Parse transcription JSON
+              with open(temp_file, 'r') as f:
+                  transcription_data = json.load(f)
+              
+              # Format as HTML
+              html_content = "<html><head><title>Transcription</title></head><body>"
+              html_content += "<h1>Transcription</h1>"
+              
+              for item in transcription_data.get('results', {}).get('transcripts', []):
+                  html_content += f"<p>{item['transcript']}</p>"
+              
+              html_content += "</body></html>"
+
+              # Save as HTML file
+              output_key = key.replace('.json', '.html')
+              output_path = '/tmp/' + output_key
+              with open(output_path, 'w') as f:
+                  f.write(html_content)
+              
+              # Upload the HTML file to the formatted output bucket
+              formatted_bucket = os.environ['FORMATTED_BUCKET']
+              s3.upload_file(output_path, formatted_bucket, output_key)
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(f"Formatted HTML saved to {formatted_bucket}/{output_key}")
+              }
+
+      Environment:
+        Variables:
+          FORMATTED_BUCKET: !Ref FormattedOutputBucketName
+      Tags:
+        - Key: Workload
+          Value: Transcription
+  
   # Permission for S3 to Invoke the Lambda Function
   TranscribeLambdaPermission:
     Type: 'AWS::Lambda::Permission'
@@ -194,15 +286,41 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${TranscribeLambda}"
       RetentionInDays: 1  # Set to a valid retention period
 
+
+  # Permission for S3 to Invoke the Formatting Lambda Function
+  FormatLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref FormatTranscriptionLambda
+      Principal: 's3.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt TranscribeOutputBucket.Arn
+
+  # CloudWatch Log Group for Formatting Lambda
+  FormatLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${FormatTranscriptionLambda}"
+      RetentionInDays: 1  # Adjust as needed
+
 Outputs:
   InputS3Bucket:
     Description: "S3 bucket to upload MP4, MP3, WAV files"
     Value: !Ref TranscribeS3Bucket
-  
+
   OutputS3Bucket:
     Description: "S3 bucket where transcription results will be stored"
     Value: !Ref TranscribeOutputBucket
 
-  LambdaFunctionARN:
-    Description: "ARN of the Transcription Lambda Function"
-    Value: !GetAtt TranscribeLambda.Arn
+  FormattedOutputS3Bucket:
+    Description: "S3 bucket where formatted Word documents are stored"
+    Value: !Ref FormattedOutputBucket
+
+  LambdaFunctionName:
+    Description: "Name of the Transcription Lambda Function"
+    Value: !Ref TranscribeLambda
+
+  FormatLambdaFunctionName:
+    Description: "Name of the Formatting Lambda Function"
+    Value: !Ref FormatTranscriptionLambda
