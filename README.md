@@ -45,7 +45,7 @@ This CloudFormation stack provisions the following resources:
 ### Deploy the Stack
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/audio-transcription-automation.git
+   git clone https://github.com/Warner-Bell/audio-transcription-build.git
    cd audio-transcription-automation
    ```
    **Update the `s3-trigger.sh` file with you stack name**
